@@ -34,65 +34,61 @@ import org.apache.metamodel.util.TimeComparator;
 
 public class SQLServerQueryRewriterTest extends TestCase {
 
-    private MutableTable table;
-    private MutableColumn column;
-    private SQLServerQueryRewriter qr = new SQLServerQueryRewriter(null);
+	private MutableTable table;
+	private MutableColumn column;
+	private SQLServerQueryRewriter qr = new SQLServerQueryRewriter(null);
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        table = new MutableTable("foo");
-        table.setSchema(new MutableSchema("MY_SCHEMA"));
-        table.setQuote("\"");
-        column = new MutableColumn("bar");
-        column.setQuote("\"");
-        column.setTable(table);
-    }
+	@Override
+	protected void setUp() throws Exception {
+		super.setUp();
+		table = new MutableTable("foo");
+		table.setSchema(new MutableSchema("MY_SCHEMA"));
+		table.setQuote("\"");
+		column = new MutableColumn("bar");
+		column.setQuote("\"");
+		column.setTable(table);
+	}
 
-    public void testRewriteColumnTypeDouble() throws Exception {
-        assertEquals("FLOAT", qr.rewriteColumnType(ColumnType.DOUBLE, null));
-    }
+	public void testRewriteColumnTypeDouble() throws Exception {
+		assertEquals("FLOAT", qr.rewriteColumnType(ColumnType.DOUBLE, null));
+	}
 
-    public void testRewriteColumnTypeVarchar() throws Exception {
-        assertEquals("VARCHAR(128)", qr.rewriteColumnType(ColumnType.VARCHAR, 128));
-        assertEquals("VARCHAR(MAX)", qr.rewriteColumnType(ColumnType.VARCHAR, null));
-    }
+	public void testRewriteColumnTypeVarchar() throws Exception {
+		assertEquals("VARCHAR(128)", qr.rewriteColumnType(ColumnType.VARCHAR, 128));
+		assertEquals("VARCHAR(MAX)", qr.rewriteColumnType(ColumnType.VARCHAR, null));
+	}
 
-    public void testRewriteFromItem() throws Exception {
-        assertEquals("foo", qr.rewriteFromItem(new FromItem(new MutableTable("foo"))));
-    }
+	public void testRewriteFromItem() throws Exception {
+		assertEquals("foo", qr.rewriteFromItem(new FromItem(new MutableTable("foo"))));
+	}
 
-    public void testAliasing() throws Exception {
-        Query q = new Query().from(table).select(column);
+	public void testAliasing() throws Exception {
+		Query q = new Query().from(table).select(column);
 
-        assertEquals("SELECT MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
-    }
+		assertEquals("SELECT MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
+	}
 
-    public void testSelectMaxRowsRewriting() throws Exception {
-        Query q = new Query().from(table).select(column).setMaxRows(20);
+	public void testSelectMaxRowsRewriting() throws Exception {
+		Query q = new Query().from(table).select(column).setMaxRows(20);
 
-        assertEquals("SELECT TOP 20 MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
-    }
+		assertEquals("SELECT TOP 20 MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
+	}
 
-    public void testRewriteFilterItem() {
+	public void testRewriteFilterItem() {
 
-        MutableColumn timestampColumn = new MutableColumn("timestamp");
-        timestampColumn.setType(ColumnType.TIMESTAMP);
-        timestampColumn.setNativeType("DATETIME");
-        Query q = new Query()
-                .from(table)
-                .select(column)
-                .select(timestampColumn)
-                .where(new FilterItem(new SelectItem(timestampColumn), OperatorType.LESS_THAN, TimeComparator
-                        .toDate("2014-06-28 14:06:00")));
+		MutableColumn timestampColumn = new MutableColumn("timestamp");
+		timestampColumn.setType(ColumnType.TIMESTAMP);
+		timestampColumn.setNativeType("DATETIME");
+		Query q = new Query().from(table).select(column).select(timestampColumn).where(new FilterItem(
+				new SelectItem(timestampColumn), OperatorType.LESS_THAN, TimeComparator.toDate("2014-06-28 14:06:00")));
 
-        assertEquals(
-                "SELECT MY_SCHEMA.\"foo\".\"bar\", timestamp FROM MY_SCHEMA.\"foo\" WHERE timestamp < CAST('20140628 14:06:00' AS DATETIME)",
-                qr.rewriteQuery(q));
-    }
+		assertEquals(
+				"SELECT MY_SCHEMA.\"foo\".\"bar\", timestamp FROM MY_SCHEMA.\"foo\" WHERE timestamp < CAST('20140628 14:06:00' AS DATETIME)",
+				qr.rewriteQuery(q));
+	}
 
-    public void testSelectMaxRowsWithDistinctRewriting() throws Exception {
-        Query q = new Query().from(table).selectDistinct().select(column).setMaxRows(20);
-        assertEquals("SELECT DISTINCT TOP 20 MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
-    }
+	public void testSelectMaxRowsWithDistinctRewriting() throws Exception {
+		Query q = new Query().from(table).selectDistinct().select(column).setMaxRows(20);
+		assertEquals("SELECT DISTINCT TOP 20 MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
+	}
 }

@@ -48,7 +48,7 @@ public class CTEQueryRewriter extends DefaultQueryRewriter {
 			if (maxRows == null) {
 				maxRows = Integer.MAX_VALUE;
 			}
-			
+
 			String select = super.rewriteSelectClause(query, query.getSelectClause()).trim();
 			String orderBy = super.rewriteOrderByClause(query, query.getOrderByClause()).trim();
 
@@ -57,7 +57,8 @@ public class CTEQueryRewriter extends DefaultQueryRewriter {
 
 			queryString = String.format("%s, ROW_NUMBER() OVER(%s) AS RowNum %s", select, orderBy, queryString);
 
-			queryString = String.format(";WITH QR AS (%s) SELECT * FROM QR WHERE RowNum BETWEEN %d AND %d", queryString, firstRow, maxRows);
+			queryString = String.format(";WITH QR AS (%s) SELECT * FROM QR WHERE RowNum BETWEEN %d AND %d", queryString,
+					firstRow, maxRows);
 		}
 
 		return queryString;
