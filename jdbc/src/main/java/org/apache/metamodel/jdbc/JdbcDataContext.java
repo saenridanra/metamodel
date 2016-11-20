@@ -54,6 +54,8 @@ import org.apache.metamodel.jdbc.dialects.MysqlQueryRewriter;
 import org.apache.metamodel.jdbc.dialects.OracleQueryRewriter;
 import org.apache.metamodel.jdbc.dialects.PostgresqlQueryRewriter;
 import org.apache.metamodel.jdbc.dialects.SQLServerQueryRewriter;
+import org.apache.metamodel.jdbc.dialects.SQLServerQueryRewriter2008;
+import org.apache.metamodel.jdbc.dialects.SQLServerQueryRewriter2012;
 import org.apache.metamodel.jdbc.dialects.SQLiteQueryRewriter;
 import org.apache.metamodel.query.AggregateFunction;
 import org.apache.metamodel.query.CompiledQuery;
@@ -90,6 +92,18 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
     public static final String DATABASE_PRODUCT_ORACLE = "Oracle";
     public static final String DATABASE_PRODUCT_HIVE = "Apache Hive";
     public static final String DATABASE_PRODUCT_SQLITE = "SQLite";
+    
+    /**
+     * Note that this is the PRODUCT Version, i.e.
+     * for 2000 it is 8.xxx..
+     * for 2005 it is 9.xxx..
+     * for 2008 it is 10.xxx..
+     * for 2012 it is 11.xxx..
+     * for 2014 it is 12.xxx..
+     */
+    public static final int DATABASE_PRODUCT_VERSION_SQLSERVER_LEGACY = 9;
+    public static final int DATABASE_PRODUCT_VERSION_SQLSERVER_2008 = 10;
+    public static final int DATABASE_PRODUCT_VERSION_SQLSERVER_2012 = 11;
 
     public static final ColumnType COLUMN_TYPE_CLOB_AS_STRING = new ColumnTypeImpl("CLOB", SuperColumnType.LITERAL_TYPE,
             String.class, true);
@@ -112,7 +126,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
      */
     private IQueryRewriter _queryRewriter;
     private final String _databaseProductName;
-
+    
     /**
      * There are some confusion as to the definition of catalogs and schemas.
      * Some databases seperate "groups of tables" by using schemas, others by
@@ -183,6 +197,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         boolean supportsBatchUpdates = false;
         String identifierQuoteString = null;
         String databaseProductName = null;
+        String databaseVersionNumber = null;
         boolean usesCatalogsAsSchemas = false;
 
         final Connection con = getConnection();
@@ -210,6 +225,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
             usesCatalogsAsSchemas = usesCatalogsAsSchemas(metaData);
             try {
                 databaseProductName = metaData.getDatabaseProductName();
+                databaseVersionNumber = metaData.getDatabaseProductVersion();
             } catch (SQLException e) {
                 logger.warn("Could not retrieve database product name: " + e.getMessage());
             }
@@ -219,6 +235,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
             closeIfNecessary(con);
         }
         _databaseProductName = databaseProductName;
+        
         logger.debug("Database product name: {}", _databaseProductName);
         if (DATABASE_PRODUCT_MYSQL.equals(_databaseProductName)) {
             setQueryRewriter(new MysqlQueryRewriter(this));
@@ -227,7 +244,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         } else if (DATABASE_PRODUCT_ORACLE.equals(_databaseProductName)) {
             setQueryRewriter(new OracleQueryRewriter(this));
         } else if (DATABASE_PRODUCT_SQLSERVER.equals(_databaseProductName)) {
-            setQueryRewriter(new SQLServerQueryRewriter(this));
+        	setSqlServerQueryRewriter(databaseVersionNumber);
         } else if (DATABASE_PRODUCT_DB2.equals(_databaseProductName)
                 || (_databaseProductName != null && _databaseProductName.startsWith(DATABASE_PRODUCT_DB2_PREFIX))) {
             setQueryRewriter(new DB2QueryRewriter(this));
@@ -300,6 +317,28 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         }
         return result;
     }
+
+	/**
+	 * Initializes the correct {@link IQueryRewriter} implementation for the given SQL Server version.
+	 * @param databaseVersionNumber
+	 */
+	private void setSqlServerQueryRewriter(String databaseVersionNumber) {
+		int integerVersionNumber = DATABASE_PRODUCT_VERSION_SQLSERVER_LEGACY;
+		
+		if(databaseVersionNumber != null)
+		{
+		    int indexOfVersionDot = databaseVersionNumber.indexOf('.');
+		    integerVersionNumber = Integer.parseInt(databaseVersionNumber.substring(0, indexOfVersionDot));
+		}
+		
+		if(integerVersionNumber < DATABASE_PRODUCT_VERSION_SQLSERVER_2008) {
+			setQueryRewriter(new SQLServerQueryRewriter(this));
+		} else if(integerVersionNumber < DATABASE_PRODUCT_VERSION_SQLSERVER_2012) {
+		    setQueryRewriter(new SQLServerQueryRewriter2008(this));
+		} else {
+		    setQueryRewriter(new SQLServerQueryRewriter2012(this));
+		}
+	}
 
     @Override
     public CompiledQuery compileQuery(Query query) {
